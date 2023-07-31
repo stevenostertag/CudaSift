@@ -14,7 +14,7 @@
 #include "cudaSiftD.h"
 #include "cudaSiftH.h"
 
-#include "cudaSiftD.cu"
+#include "../cudaSiftD.cu"
 
 void InitCuda(int devNum)
 {

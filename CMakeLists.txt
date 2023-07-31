@@ -1,9 +1,11 @@
 cmake_minimum_required(VERSION 2.6)
 
-project(cudaSift)
+project(cudasift)
 set(cudaSift_VERSION_MAJOR 2)
 set(cudaSift_VERSION_MINOR 0)
 set(cudaSift_VERSION_PATCH 0)
+
+include(GNUInstallDirs)
 
 set(CPACK_PACKAGE_VERSION_MAJOR "${cudaSift_VERSION_MAJOR}")
 set(CPACK_PACKAGE_VERSION_MINOR "${cudaSift_VERSION_MINOR}")
@@ -21,7 +23,7 @@ CPMAddPackage(
     GIT_TAG 4.6.0
     # EXCLUDE_FROM_ALL YES
     OPTIONS
-      "BUILD_SHARED_LIBS On"
+      "BUILD_SHARED_LIBS Off"
       "BUILD_TESTS Off"
       "BUILD_EXAMPLES Off"
       "BUILD_PERF_TESTS Off"
@@ -73,49 +75,62 @@ if (UNIX)
   endif()
 endif()
 
-set(cuda_sources
-  cudaImage.cu  
-  cudaImage.h  
-  cudaSiftH.cu 
-  cudaSiftH.h  
-  matching.cu  
-  cudaSiftD.h  
-  cudaSift.h  
-  cudautils.h
-)  
+set(CUDASIFT_PUBLIC_INCLUDE_DIRECTORIES      include/ )
+set(CUDASIFT_PRIVATE_INCLUDE_DIRECTORIES     src/   )
+
+file(GLOB_RECURSE CUDASIFT_SOURCE_FILES "src/*.cpp" "src/*.cu" "src/*.h")
+file(GLOB_RECURSE CUDASIFT_INCLUDE_FILES "include/*.h")
+
+# set(cuda_sources
+#   src/cudaImage.cu  
+#   src/cudaImage.h  
+#   src/cudaSiftH.cu 
+#   src/cudaSiftH.h  
+#   src/matching.cu  
+#   src/cudaSiftD.h  
+#   include/cudaSift.h  
+#   src/cudautils.h
+# )  
 
 set(sources
-  geomFuncs.cpp  
-  mainSift.cpp  
+  src/geomFuncs.cpp  
+  # mainSift.cpp  
+  src/cudaSift.cpp
 )
 
-include_directories(
-  ${CMAKE_CURRENT_SOURCE_DIR} 
-)
+# include_directories(
+#   ${CMAKE_CURRENT_SOURCE_DIR} 
+# )
 
 #SET(CUDA_SEPARABLE_COMPILATION ON)
 
-cuda_add_executable(cudasift ${cuda_sources} ${sources} OPTIONS -arch=sm_35)
+# cuda_add_library(${PROJECT_NAME} SHARED ${cuda_sources} ${sources} OPTIONS -arch=sm_35)
+cuda_add_library(${PROJECT_NAME} SHARED ${CUDASIFT_SOURCE_FILES} ${CUDASIFT_INCLUDE_FILES} OPTIONS -arch=sm_35)
+
+target_include_directories(${PROJECT_NAME} PUBLIC ${CUDASIFT_PUBLIC_INCLUDE_DIRECTORIES})
+target_include_directories(${PROJECT_NAME} PRIVATE ${CUDASIFT_PRIVATE_INCLUDE_DIRECTORIES})
+
+set_target_properties(${PROJECT_NAME}
+    PROPERTIES
+    PUBLIC_HEADER "${CUDASIFT_INCLUDE_FILES}"
+)
 
 #cuda_add_executable(l2net l2netD.cu OPTIONS -arch=sm_35)
 
-set_target_properties(cudasift PROPERTIES
+set_target_properties(${PROJECT_NAME} PROPERTIES
   COMPILE_FLAGS "${EXTRA_CXX_FLAGS}"			   
 )
 
-MESSAGE(STATUS "Include dirs ${OpenCV_INCLUDE_DIRS}")
-MESSAGE(STATUS "LINK LIBRARIES ${OpenCV_LIBS}")
-
 find_package(Threads REQUIRED)
 
-target_link_libraries(cudasift
+target_link_libraries(${PROJECT_NAME}
   ${CUDA_cudadevrt_LIBRARY} 
-  ${opencv_BINARY_DIR}/lib/libopencv_core.so
-  ${opencv_BINARY_DIR}/lib/libopencv_imgproc.so
-  ${opencv_BINARY_DIR}/lib/libopencv_imgcodecs.so
+  ${opencv_BINARY_DIR}/lib/libopencv_core.a
+  ${opencv_BINARY_DIR}/lib/libopencv_imgproc.a
+  ${opencv_BINARY_DIR}/lib/libopencv_imgcodecs.a
   pthread
 )
-target_include_directories(cudasift PRIVATE 
+target_include_directories(${PROJECT_NAME} PRIVATE 
   ${OPENCV_MODULE_opencv_core_LOCATION}/include 
   ${OPENCV_CONFIG_FILE_INCLUDE_DIR}
   ${OPENCV_MODULE_opencv_highgui_LOCATION}/include
@@ -125,16 +140,24 @@ target_include_directories(cudasift PRIVATE
 #  /usr/local/cuda/lib64/libcudadevrt.a ${OpenCV_LIBS} 
 #)
 
-add_dependencies(cudasift opencv_core opencv_imgproc opencv_imgcodecs)
+add_dependencies(${PROJECT_NAME} opencv_core opencv_imgproc opencv_imgcodecs)
  
-install(FILES 
-  ${cuda_sources} 
-  ${sources}
-  cudaSiftD.cu
-  CMakeLists.txt
-  Copyright.txt
-  DESTINATION .
-)
-install(FILES data/left.pgm data/righ.pgm
-  DESTINATION data
+# install(FILES 
+#   ${cuda_sources} 
+#   ${sources}
+#   cudaSiftD.cu
+#   CMakeLists.txt
+#   # Copyright.txt
+#   DESTINATION .
+# )
+# install(FILES data/left.pgm data/righ.pgm
+#   DESTINATION data
+# )
+
+# install(TARGETS ${PROJECT_NAME})
+install (TARGETS ${PROJECT_NAME}
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+    PUBLIC_HEADER DESTINATION include
 )
