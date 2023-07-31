@@ -11,7 +11,49 @@ set(CPACK_PACKAGE_VERSION_PATCH "${cudaSift_VERSION_PATCH}")
 set(CPACK_GENERATOR "ZIP")
 include(CPack)
 
-find_package(OpenCV REQUIRED)
+include(cmake/CPM.cmake)
+set(BUILD_LIST "core,imgproc,imgcodecs" CACHE STRING " " FORCE)
+CPMAddPackage(
+    NAME opencv
+    GITHUB_REPOSITORY opencv/opencv
+    #GIT_TAG 8.0.1
+    #GIT_TAG 8.1.1
+    GIT_TAG 4.6.0
+    # EXCLUDE_FROM_ALL YES
+    OPTIONS
+      "BUILD_SHARED_LIBS On"
+      "BUILD_TESTS Off"
+      "BUILD_EXAMPLES Off"
+      "BUILD_PERF_TESTS Off"
+      "BUILD_opencv_apps Off"
+)
+
+# include(FetchContent)
+# FetchContent_Declare(
+#         opencv
+#         GIT_REPOSITORY https://github.com/opencv/opencv.git
+#         GIT_TAG 4.6.0
+#         GIT_SHALLOW TRUE
+#         GIT_PROGRESS TRUE
+# )
+# FetchContent_MakeAvailable(opencv)
+
+get_cmake_property(_variableNames VARIABLES)
+list (SORT _variableNames)
+foreach (_variableName ${_variableNames})
+    if (ARGV0)
+        unset(MATCHED)
+        string(REGEX MATCH ${ARGV0} MATCHED ${_variableName})
+        if (NOT MATCHED)
+            continue()
+        endif()
+    endif()
+    message(STATUS "${_variableName}=${${_variableName}}")
+endforeach()
+
+message(STATUS "OPENCV_CONFIG_FILE_INCLUDE_DIR=${OPENCV_CONFIG_FILE_INCLUDE_DIR}")
+message(STATUS "OPENCV_MODULE_opencv_core_LOCATION=${OPENCV_MODULE_opencv_core_LOCATION}")
+
 find_package(CUDA)
 if (NOT CUDA_FOUND)
   message(STATUS "CUDA not found. Project will not be built.")
@@ -27,7 +69,7 @@ if (UNIX)
     list(APPEND CUDA_NVCC_FLAGS "-arch=sm_35;--compiler-options;-O2;-DVERBOSE") 
   else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -msse2 ")
-    list(APPEND CUDA_NVCC_FLAGS "-lineinfo;-ccbin;/usr/bin/gcc-6;--compiler-options;-O2;-D_FORCE_INLINES;-DVERBOSE_NOT") 
+    list(APPEND CUDA_NVCC_FLAGS "-lineinfo;-ccbin;/usr/bin/gcc;--compiler-options;-O2;-D_FORCE_INLINES;-DVERBOSE_NOT") 
   endif()
 endif()
 
@@ -61,9 +103,29 @@ set_target_properties(cudasift PROPERTIES
   COMPILE_FLAGS "${EXTRA_CXX_FLAGS}"			   
 )
 
-target_link_libraries(cudasift ${CUDA_cudadevrt_LIBRARY} ${OpenCV_LIBS})
+MESSAGE(STATUS "Include dirs ${OpenCV_INCLUDE_DIRS}")
+MESSAGE(STATUS "LINK LIBRARIES ${OpenCV_LIBS}")
+
+find_package(Threads REQUIRED)
+
+target_link_libraries(cudasift
+  ${CUDA_cudadevrt_LIBRARY} 
+  ${opencv_BINARY_DIR}/lib/libopencv_core.so
+  ${opencv_BINARY_DIR}/lib/libopencv_imgproc.so
+  ${opencv_BINARY_DIR}/lib/libopencv_imgcodecs.so
+  pthread
+)
+target_include_directories(cudasift PRIVATE 
+  ${OPENCV_MODULE_opencv_core_LOCATION}/include 
+  ${OPENCV_CONFIG_FILE_INCLUDE_DIR}
+  ${OPENCV_MODULE_opencv_highgui_LOCATION}/include
+  ${OPENCV_MODULE_opencv_imgproc_LOCATION}/include
+  ${OPENCV_MODULE_opencv_imgcodecs_LOCATION}/include
+)
 #  /usr/local/cuda/lib64/libcudadevrt.a ${OpenCV_LIBS} 
 #)
+
+add_dependencies(cudasift opencv_core opencv_imgproc opencv_imgcodecs)
  
 install(FILES 
   ${cuda_sources} 
