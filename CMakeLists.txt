@@ -40,19 +40,6 @@ CPMAddPackage(
 # )
 # FetchContent_MakeAvailable(opencv)
 
-get_cmake_property(_variableNames VARIABLES)
-list (SORT _variableNames)
-foreach (_variableName ${_variableNames})
-    if (ARGV0)
-        unset(MATCHED)
-        string(REGEX MATCH ${ARGV0} MATCHED ${_variableName})
-        if (NOT MATCHED)
-            continue()
-        endif()
-    endif()
-    message(STATUS "${_variableName}=${${_variableName}}")
-endforeach()
-
 message(STATUS "OPENCV_CONFIG_FILE_INCLUDE_DIR=${OPENCV_CONFIG_FILE_INCLUDE_DIR}")
 message(STATUS "OPENCV_MODULE_opencv_core_LOCATION=${OPENCV_MODULE_opencv_core_LOCATION}")
 
