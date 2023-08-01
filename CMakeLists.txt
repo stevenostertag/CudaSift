@@ -13,6 +13,9 @@ set(CPACK_PACKAGE_VERSION_PATCH "${cudaSift_VERSION_PATCH}")
 set(CPACK_GENERATOR "ZIP")
 include(CPack)
 
+# set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+# set(CMAKE_INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
+
 include(cmake/CPM.cmake)
 set(BUILD_LIST "core,imgproc,imgcodecs" CACHE STRING " " FORCE)
 CPMAddPackage(
@@ -23,7 +26,7 @@ CPMAddPackage(
     GIT_TAG 4.6.0
     # EXCLUDE_FROM_ALL YES
     OPTIONS
-      "BUILD_SHARED_LIBS Off"
+      "BUILD_SHARED_LIBS On"
       "BUILD_TESTS Off"
       "BUILD_EXAMPLES Off"
       "BUILD_PERF_TESTS Off"
@@ -90,8 +93,6 @@ set(sources
 # )
 
 #SET(CUDA_SEPARABLE_COMPILATION ON)
-
-# cuda_add_library(${PROJECT_NAME} SHARED ${cuda_sources} ${sources} OPTIONS -arch=sm_35)
 cuda_add_library(${PROJECT_NAME} SHARED ${CUDASIFT_SOURCE_FILES} ${CUDASIFT_INCLUDE_FILES} OPTIONS -arch=sm_35)
 
 target_include_directories(${PROJECT_NAME} PUBLIC ${CUDASIFT_PUBLIC_INCLUDE_DIRECTORIES})
@@ -112,9 +113,10 @@ find_package(Threads REQUIRED)
 
 target_link_libraries(${PROJECT_NAME}
   ${CUDA_cudadevrt_LIBRARY} 
-  ${opencv_BINARY_DIR}/lib/libopencv_core.a
-  ${opencv_BINARY_DIR}/lib/libopencv_imgproc.a
-  ${opencv_BINARY_DIR}/lib/libopencv_imgcodecs.a
+  ${opencv_BINARY_DIR}/lib/libopencv_core.so
+  ${opencv_BINARY_DIR}/lib/libopencv_imgproc.so
+  ${opencv_BINARY_DIR}/lib/libopencv_imgcodecs.so
+  # ${opencv_BINARY_DIR}/3rdparty/lib/libippiw.a
   pthread
 )
 target_include_directories(${PROJECT_NAME} PRIVATE 
@@ -127,7 +129,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 #  /usr/local/cuda/lib64/libcudadevrt.a ${OpenCV_LIBS} 
 #)
 
-add_dependencies(${PROJECT_NAME} opencv_core opencv_imgproc opencv_imgcodecs)
+add_dependencies(${PROJECT_NAME} opencv_core opencv_imgproc opencv_imgcodecs ippiw)
  
 # install(FILES 
 #   ${cuda_sources} 
@@ -143,8 +145,21 @@ add_dependencies(${PROJECT_NAME} opencv_core opencv_imgproc opencv_imgcodecs)
 
 # install(TARGETS ${PROJECT_NAME})
 install (TARGETS ${PROJECT_NAME}
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    PUBLIC_HEADER DESTINATION include
+    EXPORT "${PROJECT_NAME}Exports"
+    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+    PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )
+
+# add_executable(${PROJECT_NAME}Exe mainSift.cpp)
+# target_link_libraries(${PROJECT_NAME}Exe PUBLIC ${PROJECT_NAME})
+# # target_include_directories(${PROJECT_NAME}Exe ${PROJECT_NAME})
+
+# install (TARGETS ${PROJECT_NAME}Exe
+#     RUNTIME DESTINATION bin
+#     LIBRARY DESTINATION lib
+#     ARCHIVE DESTINATION lib
+#     PUBLIC_HEADER DESTINATION include
+# )

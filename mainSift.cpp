@@ -6,9 +6,9 @@
 #include <iostream>  
 #include <cmath>
 #include <iomanip>
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
+// #include <opencv2/core/core.hpp>
+// #include <opencv2/highgui/highgui.hpp>
+// #include <opencv2/imgproc/imgproc.hpp>
 
 #include "cudaImage.h"
 #include "cudaSift.h"
@@ -31,25 +31,25 @@ int main(int argc, char **argv)
     imgSet = std::atoi(argv[2]);
 
   // Read images using OpenCV
-  cv::Mat limg, rimg;
-  if (imgSet) {
-    cv::imread("data/left.pgm", 0).convertTo(limg, CV_32FC1);
-    cv::imread("data/righ.pgm", 0).convertTo(rimg, CV_32FC1);
-  } else {
-    cv::imread("data/img1.png", 0).convertTo(limg, CV_32FC1);
-    cv::imread("data/img2.png", 0).convertTo(rimg, CV_32FC1);
-  }
+  // cv::Mat limg, rimg;
+  // if (imgSet) {
+  //   cv::imread("data/left.pgm", 0).convertTo(limg, CV_32FC1);
+  //   cv::imread("data/righ.pgm", 0).convertTo(rimg, CV_32FC1);
+  // } else {
+  //   cv::imread("data/img1.png", 0).convertTo(limg, CV_32FC1);
+  //   cv::imread("data/img2.png", 0).convertTo(rimg, CV_32FC1);
+  // }
   //cv::flip(limg, rimg, -1);
-  unsigned int w = limg.cols;
-  unsigned int h = limg.rows;
+  unsigned int w = 1;//limg.cols;
+  unsigned int h = 1;//limg.rows;
   std::cout << "Image size = (" << w << "," << h << ")" << std::endl;
   
   // Initial Cuda images and download images to device
   std::cout << "Initializing data..." << std::endl;
   InitCuda(devNum); 
   CudaImage img1, img2;
-  img1.Allocate(w, h, iAlignUp(w, 128), false, NULL, (float*)limg.data);
-  img2.Allocate(w, h, iAlignUp(w, 128), false, NULL, (float*)rimg.data);
+  img1.Allocate(w, h, iAlignUp(w, 128), false, NULL, (float*)0);
+  img2.Allocate(w, h, iAlignUp(w, 128), false, NULL, (float*)0);
   img1.Download();
   img2.Download(); 
 
@@ -83,7 +83,7 @@ int main(int argc, char **argv)
   
   // Print out and store summary data
   PrintMatchData(siftData1, siftData2, img1);
-  cv::imwrite("data/limg_pts.pgm", limg);
+  // cv::imwrite("data/limg_pts.pgm", limg);
 
   //MatchAll(siftData1, siftData2, homography);
   
