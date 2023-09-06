@@ -132,7 +132,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 #  /usr/local/cuda/lib64/libcudadevrt.a ${OpenCV_LIBS} 
 #)
 
-add_dependencies(${PROJECT_NAME} opencv_core opencv_imgproc opencv_imgcodecs ippiw)
+add_dependencies(${PROJECT_NAME} opencv_core opencv_imgproc opencv_imgcodecs)# ippiw)
  
 # install(FILES 
 #   ${cuda_sources} 
