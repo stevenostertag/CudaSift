@@ -17,7 +17,7 @@ include(CPack)
 # set(CMAKE_INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
 
 include(cmake/CPM.cmake)
-set(BUILD_LIST "core,imgproc,imgcodecs" CACHE STRING " " FORCE)
+set(BUILD_LIST "core,imgproc,imgcodecs,highgui" CACHE STRING " " FORCE)
 CPMAddPackage(
     NAME opencv
     GITHUB_REPOSITORY opencv/opencv
