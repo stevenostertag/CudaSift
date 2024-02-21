@@ -116,9 +116,7 @@ find_package(Threads REQUIRED)
 
 target_link_libraries(${PROJECT_NAME}
   ${CUDA_cudadevrt_LIBRARY} 
-  ${opencv_BINARY_DIR}/lib/libopencv_core.so
-  ${opencv_BINARY_DIR}/lib/libopencv_imgproc.so
-  ${opencv_BINARY_DIR}/lib/libopencv_imgcodecs.so
+  ${OpenCVModules_TARGETS}
   # ${opencv_BINARY_DIR}/3rdparty/lib/libippiw.a
   pthread
 )
