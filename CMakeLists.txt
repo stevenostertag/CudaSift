@@ -118,7 +118,7 @@ target_link_libraries(${PROJECT_NAME}
   ${CUDA_cudadevrt_LIBRARY} 
   ${OpenCVModules_TARGETS}
   # ${opencv_BINARY_DIR}/3rdparty/lib/libippiw.a
-  pthread
+  Threads::Threads
 )
 target_include_directories(${PROJECT_NAME} PRIVATE 
   ${OPENCV_MODULE_opencv_core_LOCATION}/include 
