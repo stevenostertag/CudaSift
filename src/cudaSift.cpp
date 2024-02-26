@@ -13,8 +13,8 @@
 #include <stdexcept>
 
 /* Cuda runtime API */
-#include <cuda.h>
-#include <cuda_runtime.h>
+// #include <cuda.h>
+// #include <cuda_runtime.h>
 
 /* cuda sift includes */
 #include "geomFuncs.h"
