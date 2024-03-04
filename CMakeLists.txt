@@ -127,7 +127,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 find_package(Threads REQUIRED)
 
 target_link_libraries(${PROJECT_NAME}
-  ${CUDA_cudadevrt_LIBRARY} 
+  # ${CUDA_cudadevrt_LIBRARY} 
   ${OpenCVModules_TARGETS}
   # ${opencv_BINARY_DIR}/3rdparty/lib/libippiw.a
   Threads::Threads
