@@ -2,6 +2,7 @@
 #define CUDASIFT_H
 
 #include "cudaImage.h"
+#include "cudasift_export.h"
 
 typedef struct {
   float xpos;
@@ -66,7 +67,8 @@ double FindHomography(SiftData &data,  float *homography, int *numMatches, int n
  * @param thresh 1.0 is default, this value cna be moved around to try and get better results.
  * @param homography Pointer to an allocated double array that can store 9 double values.
  */
- 
+
+CUDASIFT_EXPORT 
 void CUDASIFT(int32_t       devNum,
               float*        image1,
               int32_t       image1_rows,

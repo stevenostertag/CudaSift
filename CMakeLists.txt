@@ -105,7 +105,7 @@ set(sources
 
 #SET(CUDA_SEPARABLE_COMPILATION ON)
 # cuda_add_library(${PROJECT_NAME} SHARED ${CUDASIFT_SOURCE_FILES} ${CUDASIFT_INCLUDE_FILES} OPTIONS -arch=sm_35)
-add_library(${PROJECT_NAME} SHARED ${CUDASIFT_SOURCE_FILES} ${CUDASIFT_INCLUDE_FILES})
+add_library(${PROJECT_NAME} SHARED ${CUDASIFT_SOURCE_FILES} ${CUDASIFT_INCLUDE_FILES} )
 
 include(GenerateExportHeader)
 generate_export_header(${PROJECT_NAME})
@@ -113,7 +113,9 @@ generate_export_header(${PROJECT_NAME})
 set_target_properties(${PROJECT_NAME} PROPERTIES
                             CUDA_SEPARABLE_COMPILATION ON)
 
-target_include_directories(${PROJECT_NAME} PUBLIC ${CUDASIFT_PUBLIC_INCLUDE_DIRECTORIES})
+target_include_directories(${PROJECT_NAME} PUBLIC 
+${CMAKE_CURRENT_BINARY_DIR} # Contains export header
+${CUDASIFT_PUBLIC_INCLUDE_DIRECTORIES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${CUDASIFT_PRIVATE_INCLUDE_DIRECTORIES})
 
 set_target_properties(${PROJECT_NAME}
