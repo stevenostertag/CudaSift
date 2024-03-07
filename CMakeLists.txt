@@ -136,6 +136,7 @@ target_link_libraries(${PROJECT_NAME}
   Threads::Threads
 )
 target_include_directories(${PROJECT_NAME} PRIVATE 
+  ${CMAKE_CURRENT_BINARY_DIR}
   ${OPENCV_MODULE_opencv_core_LOCATION}/include 
   ${OPENCV_CONFIG_FILE_INCLUDE_DIR}
   ${OPENCV_MODULE_opencv_highgui_LOCATION}/include
