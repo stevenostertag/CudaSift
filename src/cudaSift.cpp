@@ -12,6 +12,8 @@
 /* C++ library functions */
 #include <stdexcept>
 
+#include "cudasift_export.h"
+
 /* Cuda runtime API */
 // #include <cuda.h>
 // #include <cuda_runtime.h>
