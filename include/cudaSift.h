@@ -3,8 +3,6 @@
 
 #include "cudaImage.h"
 
-#include <cudasift_export.h>
-
 typedef struct {
   float xpos;
   float ypos;   
