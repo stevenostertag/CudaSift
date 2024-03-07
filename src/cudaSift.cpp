@@ -44,6 +44,7 @@
 
 
 /* Computational routine */
+CUDASIFT_EXPORT 
 void CUDASIFT(int32_t      devNum,
               float*       image1,     
               int32_t      image1_rows,
