@@ -105,7 +105,7 @@ set(sources
 
 #SET(CUDA_SEPARABLE_COMPILATION ON)
 # cuda_add_library(${PROJECT_NAME} SHARED ${CUDASIFT_SOURCE_FILES} ${CUDASIFT_INCLUDE_FILES} OPTIONS -arch=sm_35)
-add_library(${PROJECT_NAME} SHARED ${CUDASIFT_SOURCE_FILES} ${CUDASIFT_INCLUDE_FILES})
+add_library(${PROJECT_NAME} SHARED ${CUDASIFT_SOURCE_FILES} ${CUDASIFT_INCLUDE_FILES} )
 
 include(GenerateExportHeader)
 generate_export_header(${PROJECT_NAME})
@@ -113,7 +113,9 @@ generate_export_header(${PROJECT_NAME})
 set_target_properties(${PROJECT_NAME} PROPERTIES
                             CUDA_SEPARABLE_COMPILATION ON)
 
-target_include_directories(${PROJECT_NAME} PUBLIC ${CUDASIFT_PUBLIC_INCLUDE_DIRECTORIES})
+target_include_directories(${PROJECT_NAME} PRIVATE 
+${CMAKE_CURRENT_BINARY_DIR} # Contains export header
+${CUDASIFT_PUBLIC_INCLUDE_DIRECTORIES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${CUDASIFT_PRIVATE_INCLUDE_DIRECTORIES})
 
 set_target_properties(${PROJECT_NAME}
@@ -136,9 +138,9 @@ target_link_libraries(${PROJECT_NAME}
   Threads::Threads
 )
 target_include_directories(${PROJECT_NAME} PRIVATE 
-  ${CMAKE_CURRENT_BINARY_DIR}
+  # ${CMAKE_CURRENT_BINARY_DIR}
   ${OPENCV_MODULE_opencv_core_LOCATION}/include 
-  ${OPENCV_CONFIG_FILE_INCLUDE_DIR}
+  # ${OPENCV_CONFIG_FILE_INCLUDE_DIR}
   ${OPENCV_MODULE_opencv_highgui_LOCATION}/include
   ${OPENCV_MODULE_opencv_imgproc_LOCATION}/include
   ${OPENCV_MODULE_opencv_imgcodecs_LOCATION}/include
@@ -168,6 +170,12 @@ install (TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
     INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+)
+
+install(EXPORT "${PROJECT_NAME}Exports"
+    FILE ${PROJECT_NAME}Exports.cmake
+    NAMESPACE cudasift::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/cudasift
 )
 
 # add_executable(${PROJECT_NAME}Exe mainSift.cpp)
