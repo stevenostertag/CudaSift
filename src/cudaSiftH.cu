@@ -16,8 +16,14 @@
 
 #include "../cudaSiftD.cu"
 
+static float oldVariance = -1.0f;
+static float oldScale = -1.0f;
+
 void InitCuda(int devNum)
 {
+  oldVariance = -1.0f;
+  oldScale = -1.0f;
+
   int nDevices;
   cudaGetDeviceCount(&nDevices);
   if (!nDevices) {
@@ -307,7 +313,6 @@ void PrintSiftData(SiftData &data)
 
 double ScaleDown(CudaImage &res, CudaImage &src, float variance)
 {
-  static float oldVariance = -1.0f;
   if (res.d_data==NULL || src.d_data==NULL) {
     printf("ScaleDown: missing data\n");
     return 0.0;
@@ -406,7 +411,6 @@ double RescalePositions(SiftData &siftData, float scale)
 double LowPass(CudaImage &res, CudaImage &src, float scale)
 {
   float kernel[2*LOWPASS_R+1];
-  static float oldScale = -1.0f;
   if (scale!=oldScale) {
     float kernelSum = 0.0f;
     float ivar2 = 1.0f/(2.0f*scale*scale);
