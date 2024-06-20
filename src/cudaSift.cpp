@@ -57,6 +57,10 @@ void CUDASIFT(int32_t      devNum,
               int32_t      siftPoints,
               float        initBlur,
               float        thresh,
+              float        thresh_find_homography,
+              float        thresh_improve_homography,
+              int          loops_find_homography,
+              int          loops_improve_homography,
               double **    ret_homography,
               void (*SharePointer_Mx)(void* siftData))
 {
@@ -109,8 +113,8 @@ void CUDASIFT(int32_t      devNum,
 
   /* Find Homography */
   float homography[9];  int numMatches;
-  TRY(FindHomography(siftData1, homography, &numMatches, 100000, 0.85f, 0.95f, thresh));
-  TRY(ImproveHomography(siftData1, homography, 500, 0.00f, 0.95f, thresh));
+  TRY(FindHomography(siftData1, homography, &numMatches, loops_find_homography, 0.85f, 0.95f, thresh_find_homography));
+  TRY(ImproveHomography(siftData1, homography, loops_improve_homography, 0.00f, 0.95f, thresh_improve_homography));
 
 
   FreeSiftData(siftData1);

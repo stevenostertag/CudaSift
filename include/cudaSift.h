@@ -65,6 +65,10 @@ double FindHomography(SiftData &data,  float *homography, int *numMatches, int n
  * @param siftPoints Allocatable sift points. 10 * sqrt(numel(image1) + numel(image2)) is probably enough.
  * @param initBlur 4.0 is default, this value cna be moved around to try and get better results.
  * @param thresh 1.0 is default, this value cna be moved around to try and get better results.
+ * @param thresh_find_homography 5.0 is default, this value cna be moved around to try and get better results.
+ * @param thresh_improve_homography 3.5 is default, this value cna be moved around to try and get better results.
+ * @param loops_find_homography 100000 is default, this value cna be moved around to try and get better results.
+ * @param loops_improve_homography 500 is default, this value cna be moved around to try and get better results.
  * @param homography Pointer to an allocated double array that can store 9 double values.
  */
  
@@ -79,6 +83,10 @@ void CUDASIFT(int32_t       devNum,
               int32_t       siftPoints,
               float         initBlur,
               float         thresh,
+              float         thresh_find_homography,
+              float         thresh_improve_homography,
+              int           loops_find_homography,
+              int           loops_improve_homography,
               double **     homography,
               void (*func)(void*));
 
