@@ -25,6 +25,14 @@ include(CPack)
 # set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 # set(CMAKE_INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
 
+option(BUILD_SHARED_LIB "Compile as a shared library" ON) #OFF by default
+
+if(BUILD_SHARED_LIB)
+  set(OPENCV_SHARED_LIBS "BUILD_SHARED_LIBS On")
+else()
+set(OPENCV_SHARED_LIBS "BUILD_SHARED_LIBS Off")
+endif(BUILD_SHARED_LIB)
+
 include(cmake/CPM.cmake)
 set(BUILD_LIST "core,imgproc,imgcodecs,highgui" CACHE STRING " " FORCE)
 CPMAddPackage(
@@ -35,7 +43,7 @@ CPMAddPackage(
     GIT_TAG 4.6.0
     # EXCLUDE_FROM_ALL YES
     OPTIONS
-      "BUILD_SHARED_LIBS On"
+      ${OPENCV_SHARED_LIBS}
       "BUILD_TESTS Off"
       "BUILD_EXAMPLES Off"
       "BUILD_PERF_TESTS Off"
@@ -110,7 +118,11 @@ set(CUDASIFT_PUBLIC_HEADERS
 
 #SET(CUDA_SEPARABLE_COMPILATION ON)
 # cuda_add_library(${PROJECT_NAME} SHARED ${CUDASIFT_SOURCE_FILES} ${CUDASIFT_INCLUDE_FILES} OPTIONS -arch=sm_35)
-add_library(${PROJECT_NAME} SHARED)
+if(BUILD_SHARED_LIB)
+  add_library(${PROJECT_NAME} SHARED)
+else()
+  add_library(${PROJECT_NAME} STATIC)
+endif()
 
 target_sources(${PROJECT_NAME}
 PRIVATE 
