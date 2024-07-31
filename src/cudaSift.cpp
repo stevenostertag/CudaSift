@@ -59,7 +59,7 @@ void CUDASIFT(int32_t      devNum,
               float        thresh,
               float        thresh_find_homography,
               float        thresh_improve_homography,
-              int          loops_find_homography,
+              int          loop_multiplier_find_homography,
               int          loops_improve_homography,
               double **    ret_homography,
               void (*SharePointer_Mx)(void* siftData))
@@ -113,7 +113,7 @@ void CUDASIFT(int32_t      devNum,
 
   /* Find Homography */
   float homography[9];  int numMatches;
-  TRY(FindHomography(siftData1, homography, &numMatches, 10*siftData1.numPts, 0.85f, 0.95f, thresh_find_homography));
+  TRY(FindHomography(siftData1, homography, &numMatches, loop_multiplier_find_homography*siftData1.numPts, 0.85f, 0.95f, thresh_find_homography));
   TRY(ImproveHomography(siftData1, homography, loops_improve_homography, 0.00f, 0.95f, thresh_improve_homography));
 
 
