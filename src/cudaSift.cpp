@@ -113,7 +113,7 @@ void CUDASIFT(int32_t      devNum,
 
   /* Find Homography */
   float homography[9];  int numMatches;
-  TRY(FindHomography(siftData1, homography, &numMatches, loops_find_homography, 0.85f, 0.95f, thresh_find_homography));
+  TRY(FindHomography(siftData1, homography, &numMatches, 10*siftData1.numPts, 0.85f, 0.95f, thresh_find_homography));
   TRY(ImproveHomography(siftData1, homography, loops_improve_homography, 0.00f, 0.95f, thresh_improve_homography));
 
 
