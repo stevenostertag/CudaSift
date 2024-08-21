@@ -388,11 +388,15 @@ __global__ void FindMaxCorr10(SiftPoint *sift1, SiftPoint *sift2, int numPts1, i
 	} else if (scores1[y*M7W + tx]>sec_score)
 	  sec_score = scores1[y*M7W + tx];
       }
-    sift1[bp1 + tx].score = max_score;
-    sift1[bp1 + tx].match = index;
-    sift1[bp1 + tx].match_xpos = sift2[index].xpos;
-    sift1[bp1 + tx].match_ypos = sift2[index].ypos;
-    sift1[bp1 + tx].ambiguity = sec_score / (max_score + 1e-6f);
+
+    if(bp1 + tx < numPts1)
+    {
+      sift1[bp1 + tx].score = max_score;
+      sift1[bp1 + tx].match = index;
+      sift1[bp1 + tx].match_xpos = sift2[index].xpos;
+      sift1[bp1 + tx].match_ypos = sift2[index].ypos;
+      sift1[bp1 + tx].ambiguity = sec_score / (max_score + 1e-6f);
+    }
   }
 }
   
