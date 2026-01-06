@@ -1,134 +1,93 @@
-# CudaSift - SIFT features with CUDA
+# ORCA_cudasift
 
-This is the fourth version of a SIFT (Scale Invariant Feature Transform) implementation using CUDA for GPUs from NVidia. The first version is from 2007 and GPUs have evolved since then. This version is slightly more precise and considerably faster than the previous versions and has been optimized for Kepler and later generations of GPUs.
 
-On a GTX 1060 GPU the code takes about 1.2 ms on a 1280x960 pixel image and 1.7 ms on a 1920x1080 pixel image. There is also code for brute-force matching of features that takes about 2.2 ms for two sets of around 1900 SIFT features each.
 
-The code relies on CMake for compilation and OpenCV for image containers. OpenCV can however be quite easily changed to something else. The code can be relatively hard to read, given the way things have been parallelized for maximum speed.
+## Getting started
 
-The code is free to use for non-commercial applications. If you use the code for research, please cite to the following paper.
+To make it easy for you to get started with GitLab, here's a list of recommended next steps.
 
-M. Bj&ouml;rkman, N. Bergstr&ouml;m and D. Kragic, "Detecting, segmenting and tracking unknown objects using multi-label MRF inference", CVIU, 118, pp. 111-127, January 2014. [ScienceDirect](http://www.sciencedirect.com/science/article/pii/S107731421300194X)
+Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
 
-## Update in feature matching (2019-05-17)
+## Add your files
 
-The brute force feature matcher has been significantly improved in speed. The largest improvements can be seen for large feature sets with 10000 features or more, but as can be seen below, it performs rather well even with just 2000 features. The file [match.pdf](https://github.com/Celebrandil/CudaSift/blob/Pascal/match.pdf) includes a description of the optimizations done in this version.
+- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
+- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
 
-## New version for Pascal (2018-10-26)
+```
+cd existing_repo
+git remote add origin https://spork.fusion.navy.mil/advanced-sonar-processing/orca_cudasift.git
+git branch -M main
+git push -uf origin main
+```
 
-There is a new version optimized for Pascal cards, but it should work also on many older cards. Since it includes some bug fixes that changes slightly how features are extracted, which might affect matching to features extracted using an older version, the changes are kept in a new branch (Pascal). The fixes include a small change in ScaleDown that corrects an odd behaviour for images with heights not divisible by 2^(#octaves). The second change is a correction of an improper shift of (0.5,0.5) pixels, when pixel values were read from the image to create a descriptor. 
+## Integrate with your tools
 
-Then there are some improvements in terms of speed, especially in the Laplace function, that detects DoG features, and the LowPass function, that is seen as preprocessing and is not included in the benchmarking below. Maybe surprisingly, even if optimizations were done with respect to Pascal cards, these improvements were even better for older cards. The changes involve trying to make each CUDA thread have more work to do, using fewer thread blocks. For typical images of today, there will be enough blocks to feed the streaming multiprocessors anyway.
+- [ ] [Set up project integrations](https://spork.fusion.navy.mil/advanced-sonar-processing/orca_cudasift/-/settings/integrations)
 
-Latest result of version under test:
+## Collaborate with your team
 
-|         |                     | 1280x960 | 1920x1080 |  GFLOPS  | Bandwidth | Matching |
-| ------- | ------------------- | -------| ---------| ---------- | --------|--------|
-| Turing  | GeForce RTX 2080 Ti |   0.42* |     0.56* |	11750    |  616    |   0.30* |
-| Pascal  | GeForce GTX 1080 Ti |   0.58* |     0.80* |	10609    |  484    |   0.42* |
-| Pascal  | GeForce GTX 1060    |   1.2 |     1.7 |	3855    |  192    |   2.2 |
-| Maxwell | GeForce GTX 970     |   1.3 |     1.8 |    3494    |  224    |   2.5 |
-| Kepler  | Tesla K40c          |   2.4 |     3.4 |    4291    |  288    |   4.7 |
+- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
+- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
+- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
+- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
+- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
 
-Matching is done between two sets of 1911 and 2086 features respectively. A star indicates results from the last checked in version.
+## Test and Deploy
 
-## Benchmarking of new version (2018-08-22)
+Use the built-in continuous integration in GitLab.
 
-About every 2nd year, I try to update the code to gain even more speed through further optimization. Here are some results for a new version of the code. Improvements in speed have primarilly been gained by reducing communication between host and device, better balancing the load on caches, shared and global memory, and increasing the workload of each thread block.
+- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
+- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
+- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
+- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
+- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
 
-|         |                     | 1280x960 | 1920x1080 |  GFLOPS  | Bandwidth | Matching |
-| ------- | ------------------- | -------| ---------| ---------- | --------|--------|
-| Pascal  | GeForce GTX 1080 Ti |   0.7  |     1.0  |	10609    |  484    |   1.0 |
-| Pascal  | GeForce GTX 1060    |   1.6  |     2.4  |	3855    |  192    |   2.2 |
-| Maxwell | GeForce GTX 970     |   1.9  |     2.8  |    3494    |  224    |   2.5 |
-| Kepler  | Tesla K40c          |   3.1  |     4.7  |    4291    |  288    |   4.7 |
-| Kepler  | GeForce GTX TITAN   |   2.9  |     4.3  |    4500    |  288    |   4.5 |
+***
 
-Matching is done between two sets of 1818 and 1978 features respectively. 
+# Editing this README
 
-It's questionable whether further optimization really makes sense, given that the cost of just transfering an 1920x1080 pixel image to the device takes about 1.4 ms on a GTX 1080 Ti. Even if the brute force feature matcher is not much faster than earlier versions, it does not have the same O(N^2) temporary memory overhead, which is preferable if there are many features.
+When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
 
-## Benchmarking of previous version (2017-05-24)
+## Suggestions for a good README
 
-Computational cost (in milliseconds) on different GPUs:
+Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
 
-|         |                     | 1280x960 | 1920x1080 |  GFLOPS  | Bandwidth | Matching |
-| ------- | ------------------- | -------| ---------| ---------- | --------|--------|
-| Pascal  | GeForce GTX 1080 Ti |   1.7  |     2.3  |	10609    |  484    |   1.4 |
-| Pascal  | GeForce GTX 1060    |   2.7  |     4.0  |	 3855    |  192    |   2.6 |
-| Maxwell | GeForce GTX 970     |   3.8  |     5.6  |    3494    |  224    |   2.8 |
-| Kepler  | Tesla K40c          |   5.4  |     8.0  |    4291    |  288    |   5.5 |
-| Kepler  | GeForce GTX TITAN   |   4.4  |     6.6  |    4500    |  288    |   4.6 |
+## Name
+Choose a self-explaining name for your project.
 
-Matching is done between two sets of 1616 and 1769 features respectively. 
- 
-The improvements in this version involved a slight adaptation for Pascal, changing from textures to global memory (mostly through L2) in the most costly function LaplaceMulti. The medium-end card GTX 1060 is impressive indeed. 
+## Description
+Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+
+## Badges
+On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+
+## Visuals
+Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+
+## Installation
+Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
 
 ## Usage
+Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
 
-There are two different containers for storing data on the host and on the device; *SiftData* for SIFT features and *CudaImage* for images. Since memory allocation on GPUs is slow, it's usually preferable to preallocate a sufficient amount of memory using *InitSiftData()*, in particular if SIFT features are extracted from a continuous stream of video camera images. On repeated calls *ExtractSift()* will reuse memory previously allocated.
-~~~c
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <cudaImage.h>
-#include <cudaSift.h>
+## Support
+Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
 
-/* Reserve memory space for a whole bunch of SIFT features. */
-SiftData siftData;
-InitSiftData(siftData, 25000, true, true);
+## Roadmap
+If you have ideas for releases in the future, it is a good idea to list them in the README.
 
-/* Read image using OpenCV and convert to floating point. */
-cv::Mat limg;
-cv::imread("image.png", 0).convertTo(limg, CV32FC1);
-/* Allocate 1280x960 pixel image with device side pitch of 1280 floats. */ 
-/* Memory on host side already allocated by OpenCV is reused.           */
-CudaImage img;
-img.Allocate(1280, 960, 1280, false, NULL, (float*) limg.data);
-/* Download image from host to device */
-img.Download();
+## Contributing
+State if you are open to contributions and what your requirements are for accepting them.
 
-int numOctaves = 5;    /* Number of octaves in Gaussian pyramid */
-float initBlur = 1.0f; /* Amount of initial Gaussian blurring in standard deviations */
-float thresh = 3.5f;   /* Threshold on difference of Gaussians for feature pruning */
-float minScale = 0.0f; /* Minimum acceptable scale to remove fine-scale features */
-bool upScale = false;  /* Whether to upscale image before extraction */
-/* Extract SIFT features */
-ExtractSift(siftData, img, numOctaves, initBlur, thresh, minScale, upScale);
-...
-/* Free space allocated from SIFT features */
-FreeSiftData(siftData);
+For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
 
-~~~
+You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
 
-## Parameter setting
+## Authors and acknowledgment
+Show your appreciation to those who have contributed to the project.
 
-The requirements on number and quality of features vary from application to application. Some applications benefit from a smaller number of high quality features, while others require as many features as possible. More distinct features with higher DoG (difference of Gaussians) responses tend to be of higher quality and are easier to match between multiple views. With the parameter *thresh* a threshold can be set on the minimum DoG to prune features of less quality. 
+## License
+For open source projects, say how it is licensed.
 
-In many cases the most fine-scale features are of little use, especially when noise conditions are severe or when features are matched between very different views. In such cases the most fine-scale features can be pruned by setting *minScale* to the minimum acceptable feature scale, where 1.0 corresponds to the original image scale without upscaling. As a consequence of pruning the computational cost can also be reduced.
-
-To increase the number of SIFT features, but also increase the computational cost, the original image can be automatically upscaled to double the size using the *upScale* parameter, in accordance to Lowe's recommendations. One should keep in mind though that by doing so the fraction of features that can be matched tend to go down, even if the total number of extracted features increases significantly. If it's enough to instead reduce the *thresh* parameter to get more features, that is often a better alternative.
-
-Results without upscaling (upScale=False) of 1280x960 pixel input image. 
-
-| *thresh* | #Matches | %Matches | Cost (ms) |
-|-----------|----------|----------|-----------|
-|    1.0    |   4236   |   40.4%  |    5.8    |
-|    1.5    |   3491   |   42.5%  |    5.2    |
-|    2.0    |   2720   |   43.2%  |    4.7    |
-|    2.5    |   2121   |   44.4%  |    4.2    |
-|    3.0    |   1627   |   45.8%  |    3.9    |
-|    3.5    |   1189   |   46.2%  |    3.6    |
-|    4.0    |    881   |   48.5%  |    3.3    |
-
-
-Results with upscaling (upScale=True) of 1280x960 pixel input image.
-
-| *thresh* | #Matches | %Matches | Cost (ms) |
-|-----------|----------|----------|-----------|
-|    2.0    |   4502   |   34.9%  |   13.2    |
-|    2.5    |   3389   |   35.9%  |   11.2    |
-|    3.0    |   2529   |   37.1%  |   10.6    |
-|    3.5    |   1841   |   38.3%  |    9.9    |
-|    4.0    |   1331   |   39.8%  |    9.5    |
-|    4.5    |    954   |   42.2%  |    9.3    |
-|    5.0    |    611   |   39.3%  |    9.1    |
+## Project status
+If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.

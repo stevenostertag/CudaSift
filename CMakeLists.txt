@@ -1,222 +1,133 @@
-cmake_minimum_required(VERSION 2.6)
+cmake_minimum_required(VERSION 3.16)
 
-project(cudasift LANGUAGES CUDA CXX)
-set(cudaSift_VERSION_MAJOR 2)
-set(cudaSift_VERSION_MINOR 0)
-set(cudaSift_VERSION_PATCH 0)
+project(CUDA_SIFT C CXX CUDA)
 
-include(CheckLanguage)
-check_language(CUDA)
-enable_language(CUDA)
+# Using C17 and C++17 set(CMAKE_C_STANDARD 14) set(CMAKE_C_STANDARD_REQUIRED ON)
 
-if(NOT DEFINED CMAKE_CUDA_STANDARD)
-    set(CMAKE_CUDA_STANDARD 17)
-    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-endif()
+# set(CMAKE_CXX_STANDARD 14) set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-include(GNUInstallDirs)
+# Compile for all possible gpu compute capability cards
+option(ALL_GPU_ARCHS OFF)
 
-set(CPACK_PACKAGE_VERSION_MAJOR "${cudaSift_VERSION_MAJOR}")
-set(CPACK_PACKAGE_VERSION_MINOR "${cudaSift_VERSION_MINOR}")
-set(CPACK_PACKAGE_VERSION_PATCH "${cudaSift_VERSION_PATCH}")
-set(CPACK_GENERATOR "ZIP")
-include(CPack)
+# if(WIN32) # Make sure to statically link C/C++ windows runtime libs
+# set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+# endif()
 
-# set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-# set(CMAKE_INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
+# Find Cuda Toolkit
+find_package(CUDAToolkit REQUIRED)
 
-option(BUILD_SHARED_LIB "Compile as a shared library" ON) #OFF by default
+# Find optional openmp
+find_package(OpenMP)
 
-if(BUILD_SHARED_LIB)
-  set(OPENCV_SHARED_LIBS "BUILD_SHARED_LIBS On")
+# spdlog needs to be built with fpic, jumping through some hoops to prevent
+# affecting top level cmake
+if(DEFINED CMAKE_POSITION_INDEPENDENT_CODE)
+  set(FORCE_FPIC ON)
+  set(CMAKE_POSITION_INDEPENDENT_CODE_OLD ${CMAKE_POSITION_INDEPENDENT_CODE})
 else()
-set(OPENCV_SHARED_LIBS "BUILD_SHARED_LIBS Off")
-endif(BUILD_SHARED_LIB)
-
-include(cmake/CPM.cmake)
-set(BUILD_LIST "core,imgproc,imgcodecs,highgui" CACHE STRING " " FORCE)
-CPMAddPackage(
-    NAME opencv
-    GITHUB_REPOSITORY opencv/opencv
-    #GIT_TAG 8.0.1
-    #GIT_TAG 8.1.1
-    GIT_TAG 4.6.0
-    # EXCLUDE_FROM_ALL YES
-    OPTIONS
-      ${OPENCV_SHARED_LIBS}
-      "BUILD_TESTS Off"
-      "BUILD_EXAMPLES Off"
-      "BUILD_PERF_TESTS Off"
-      "BUILD_opencv_apps Off"
-)
-
-# include(FetchContent)
-# FetchContent_Declare(
-#         opencv
-#         GIT_REPOSITORY https://github.com/opencv/opencv.git
-#         GIT_TAG 4.6.0
-#         GIT_SHALLOW TRUE
-#         GIT_PROGRESS TRUE
-# )
-# FetchContent_MakeAvailable(opencv)
-
-message(STATUS "OPENCV_CONFIG_FILE_INCLUDE_DIR=${OPENCV_CONFIG_FILE_INCLUDE_DIR}")
-message(STATUS "OPENCV_MODULE_opencv_core_LOCATION=${OPENCV_MODULE_opencv_core_LOCATION}")
-
-find_package(CUDA)
-if (NOT CUDA_FOUND)
-  message(STATUS "CUDA not found. Project will not be built.")
-endif(NOT CUDA_FOUND)
-
-if (WIN32)
-  set(EXTRA_CXX_FLAGS "/DVERBOSE /D_CRT_SECURE_NO_WARNINGS ")
-  # list(APPEND CUDA_NVCC_FLAGS "-arch=sm_35;--compiler-options;-O2;-DVERBOSE") 
-  list(APPEND CUDA_NVCC_FLAGS "--compiler-options;-DVERBOSE") 
+  set(FORCE_FPIC OFF)
 endif()
-if (UNIX)
-  if (APPLE)
-    set(EXTRA_CXX_FLAGS "-DVERBOSE")
-    # list(APPEND CUDA_NVCC_FLAGS "-arch=sm_35;--compiler-options;-O2;-DVERBOSE") 
-    list(APPEND CUDA_NVCC_FLAGS "--compiler-options;-O2;-DVERBOSE") 
+
+if(NOT TARGET spdlog)
+
+  message("spdlog not found while building cudasift - adding package")
+
+  include(cmake/CPM.cmake)
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+  cpmaddpackage(
+    NAME
+    spdlog
+    GITHUB_REPOSITORY
+    gabime/spdlog
+    GIT_TAG
+    v1.13.0
+    OPTIONS
+    "SPDLOG_INSTALL ON")
+
+  if(FORCE_FPIC)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ${CMAKE_POSITION_INDEPENDENT_CODE_OLD})
   else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
-    list(APPEND CUDA_NVCC_FLAGS "-lineinfo;-ccbin;/usr/bin/gcc;--compiler-options;-O2;-D_FORCE_INLINES;-DVERBOSE_NOT") 
+    unset(CMAKE_POSITION_INDEPENDENT_CODE)
+  endif()
+
+endif()
+
+# Set the source files
+set(SRC cuSIFT.cu geomFuncs_blas.cu matching.cu cudaImage.cu cudaSift.cu)
+
+set(CUDASIFT_PUBLIC_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/)
+
+if(WIN32)
+  add_library(cudasift STATIC ${SRC})
+elseif(UNIX)
+  add_library(cudasift STATIC ${SRC})
+else()
+  message(FATAL_ERROR "Only Windows and Linux supported")
+endif()
+
+target_include_directories(
+  cudasift
+  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}> # Contains export header
+         $<BUILD_INTERFACE:${CUDASIFT_PUBLIC_INCLUDE_DIRECTORIES}>)
+
+target_link_libraries(cudasift PRIVATE spdlog)
+
+# Link libraries, only cuda
+if(WIN32)
+  target_link_libraries(cudasift PUBLIC CUDA::cublas CUDA::cudart_static)
+  if(OpenMP_C_FOUND)
+    target_link_libraries(cudasift PUBLIC OpenMP::OpenMP_C)
+  elseif(OpenMP_CXX_FOUND)
+    target_link_libraries(cudasift PUBLIC OpenMP::OpenMP_CXX)
+  endif()
+else()
+  target_link_libraries(cudasift PUBLIC CUDA::cublas CUDA::cudart_static)
+  if(OpenMP_C_FOUND)
+    target_link_libraries(cudasift PUBLIC OpenMP::OpenMP_C)
+  elseif(OpenMP_CXX_FOUND)
+    target_link_libraries(cudasift PUBLIC OpenMP::OpenMP_CXX)
   endif()
 endif()
 
-set(CUDASIFT_PUBLIC_INCLUDE_DIRECTORIES      ${CMAKE_CURRENT_SOURCE_DIR}/include/ )
-set(CUDASIFT_PRIVATE_INCLUDE_DIRECTORIES     ${CMAKE_CURRENT_SOURCE_DIR}/src/   )
-
-file(GLOB_RECURSE CUDASIFT_SOURCE_FILES "src/*.cpp" "src/*.cu" "src/*.h")
-file(GLOB_RECURSE CUDASIFT_INCLUDE_FILES "include/*.h")
-
-# set(cuda_sources
-#   src/cudaImage.cu  
-#   src/cudaImage.h  
-#   src/cudaSiftH.cu 
-#   src/cudaSiftH.h  
-#   src/matching.cu  
-#   src/cudaSiftD.h  
-#   include/cudaSift.h  
-#   src/cudautils.h
-# )  
-
-set(sources
-  src/geomFuncs.cpp  
-  # mainSift.cpp  
-  src/cudaSift.cpp
-)
-
-# include_directories(
-#   ${CMAKE_CURRENT_SOURCE_DIR} 
-# )
-
-set(CUDASIFT_PUBLIC_HEADERS
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/cudaSift.h>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/cudaImage.h>
-)
-
-#SET(CUDA_SEPARABLE_COMPILATION ON)
-# cuda_add_library(${PROJECT_NAME} SHARED ${CUDASIFT_SOURCE_FILES} ${CUDASIFT_INCLUDE_FILES} OPTIONS -arch=sm_35)
-if(BUILD_SHARED_LIB)
-  add_library(${PROJECT_NAME} SHARED)
+if(WIN32)
+  add_executable(test_cuda_sift cudasift_test.cu cuSIFT.cu geomFuncs_blas.cu
+                                matching.cu cudaImage.cu cudaSift.cu)
+  target_link_libraries(test_cuda_sift PUBLIC CUDA::cublas CUDA::cudart_static)
+  if(OpenMP_C_FOUND)
+    target_link_libraries(test_cuda_sift PUBLIC OpenMP::OpenMP_C)
+  elseif(OpenMP_CXX_FOUND)
+    target_link_libraries(test_cuda_sift PUBLIC OpenMP::OpenMP_CXX)
+  endif()
 else()
-  add_library(${PROJECT_NAME} STATIC)
+  add_executable(test_cuda_sift cudasift_test.cu)
+  target_link_libraries(test_cuda_sift PUBLIC cudasift)
+
+  set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
 endif()
 
-set_target_properties(${PROJECT_NAME} PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+target_link_libraries(test_cuda_sift PRIVATE spdlog)
 
-target_sources(${PROJECT_NAME}
-PRIVATE 
-${CUDASIFT_SOURCE_FILES} ${CUDASIFT_INCLUDE_FILES} 
-PUBLIC
-${CUDASIFT_PUBLIC_HEADERS})
+# Set all major architectures
+if(${ALL_GPU_ARCHS})
+  message("-- Building all gpu archs possible")
+  set_property(TARGET cudasift PROPERTY CUDA_ARCHITECTURES all)
+  set_property(TARGET test_cuda_sift PROPERTY CUDA_ARCHITECTURES all)
+else()
+  message("-- Building for currrent machine gpu arch only")
+endif()
 
-target_sources(${PROJECT_NAME} PUBLIC FILE_SET HEADERS
-  BASE_DIRS ${PROJECT_SOURCE_DIR}/include
-  FILES ${CUDASIFT_INCLUDE_FILES}
-)
+# Install if(WIN32) install( TARGETS cudasift EXPORT "cudasiftExports" RUNTIME
+# DESTINATION ${CMAKE_INSTALL_PREFIX}/bin) install( TARGETS test_cuda_sift
+# EXPORT "test_cuda_siftExports" RUNTIME DESTINATION
+# ${CMAKE_INSTALL_PREFIX}/bin) install(FILES cuSIFT.h DESTINATION
+# ${CMAKE_INSTALL_PREFIX}/include) else() install( TARGETS cudasift EXPORT
+# "cudasiftExports" LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib) install(
+# TARGETS test_cuda_sift EXPORT "test_cuda_siftExports" RUNTIME DESTINATION
+# ${CMAKE_INSTALL_PREFIX}/bin) install(FILES cuSIFT.h EXPORT
+# "${PROJECT_NAME}Exports" DESTINATION ${CMAKE_INSTALL_PREFIX}/include) endif()
 
-include(GenerateExportHeader)
-generate_export_header(${PROJECT_NAME})
-
-set_target_properties(${PROJECT_NAME} PROPERTIES
-                            CUDA_SEPARABLE_COMPILATION ON)
-
-target_include_directories(${PROJECT_NAME} PUBLIC 
-$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}> # Contains export header
-$<BUILD_INTERFACE:${CUDASIFT_PUBLIC_INCLUDE_DIRECTORIES}>)
-
-target_include_directories(${PROJECT_NAME} PRIVATE ${CUDASIFT_PRIVATE_INCLUDE_DIRECTORIES})
-
-set_target_properties(${PROJECT_NAME}
-    PROPERTIES
-    PUBLIC_HEADER "${CUDASIFT_INCLUDE_FILES}"
-)
-
-#cuda_add_executable(l2net l2netD.cu OPTIONS -arch=sm_35)
-
-set_target_properties(${PROJECT_NAME} PROPERTIES
-  COMPILE_FLAGS "${EXTRA_CXX_FLAGS}"			   
-)
-
-find_package(Threads REQUIRED)
-
-target_link_libraries(${PROJECT_NAME}
-  # ${CUDA_cudadevrt_LIBRARY} 
-  ${OpenCVModules_TARGETS}
-  # ${opencv_BINARY_DIR}/3rdparty/lib/libippiw.a
-  Threads::Threads
-)
-target_include_directories(${PROJECT_NAME} PRIVATE 
-  # ${CMAKE_CURRENT_BINARY_DIR}
-  ${OPENCV_MODULE_opencv_core_LOCATION}/include 
-  ${OPENCV_CONFIG_FILE_INCLUDE_DIR}
-  ${OPENCV_MODULE_opencv_highgui_LOCATION}/include
-  ${OPENCV_MODULE_opencv_imgproc_LOCATION}/include
-  ${OPENCV_MODULE_opencv_imgcodecs_LOCATION}/include
-)
-#  /usr/local/cuda/lib64/libcudadevrt.a ${OpenCV_LIBS} 
-#)
-
-add_dependencies(${PROJECT_NAME} opencv_core opencv_imgproc opencv_imgcodecs)# ippiw)
- 
-# install(FILES 
-#   ${cuda_sources} 
-#   ${sources}
-#   cudaSiftD.cu
-#   CMakeLists.txt
-#   # Copyright.txt
-#   DESTINATION .
-# )
-# install(FILES data/left.pgm data/righ.pgm
-#   DESTINATION data
-# )
-
-# install(TARGETS ${PROJECT_NAME})
-install (TARGETS ${PROJECT_NAME}
-    EXPORT "${PROJECT_NAME}Exports"
-    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-    PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-    FILE_SET HEADERS
-)
-
-install(EXPORT "${PROJECT_NAME}Exports"
-    FILE ${PROJECT_NAME}Exports.cmake
-    NAMESPACE cudasift::
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/cudasift
-)
-
-# add_executable(${PROJECT_NAME}Exe mainSift.cpp)
-# target_link_libraries(${PROJECT_NAME}Exe PUBLIC ${PROJECT_NAME})
-# # target_include_directories(${PROJECT_NAME}Exe ${PROJECT_NAME})
-
-# install (TARGETS ${PROJECT_NAME}Exe
-#     RUNTIME DESTINATION bin
-#     LIBRARY DESTINATION lib
-#     ARCHIVE DESTINATION lib
-#     PUBLIC_HEADER DESTINATION include
-# )
+# install( EXPORT "test_cuda_siftExports" FILE test_cuda_siftExports.cmake
+# NAMESPACE cudasift:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/cudasift)
+#
+# install( EXPORT "cudasiftExports" FILE cudasiftExports.cmake NAMESPACE
+# cudasift:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/cudasift)
