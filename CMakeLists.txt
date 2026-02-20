@@ -9,6 +9,9 @@ project(CUDA_SIFT C CXX CUDA)
 # Compile for all possible gpu compute capability cards
 option(ALL_GPU_ARCHS OFF)
 
+option(CUDASIFT_DETERMINISTIC_TESTING
+       "Enable for reproducible random numbers in tests" OFF)
+
 # if(WIN32) # Make sure to statically link C/C++ windows runtime libs
 # set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 # endif()
@@ -106,6 +109,12 @@ else()
 endif()
 
 target_link_libraries(test_cuda_sift PRIVATE spdlog)
+
+if(CUDASIFT_DETERMINISTIC_TESTING)
+  message(STATUS "CudaSift: Compiling with deterministic testing enabled.")
+  target_compile_definitions(cudasift PRIVATE DETERMINISTIC_TESTING)
+  target_compile_definitions(test_cuda_sift PRIVATE DETERMINISTIC_TESTING)
+endif()
 
 # Set all major architectures
 if(${ALL_GPU_ARCHS})
