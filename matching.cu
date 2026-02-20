@@ -37,6 +37,11 @@ __global__ void CleanMatches(SiftPoint *sift1, int numPts1)
 {
     const int p1 = min(blockIdx.x * 64 + threadIdx.x, numPts1 - 1);
     sift1[p1].score = 0.0f;
+    sift1[p1].match = -1;
+    sift1[p1].ambiguity = 1.0f;
+    sift1[p1].match_xpos = 0.0f;
+    sift1[p1].match_ypos = 0.0f;
+    sift1[p1].match_error = 0.0f;
 }
 
 #define M7W 32
@@ -109,11 +114,12 @@ __global__ void FindMaxCorr10(SiftPoint *sift1, SiftPoint *sift2, int numPts1, i
             {
                 for (int i = 0; i < NRX; i++)
                 {
-                    if (score[dy][i] > max_score[i])
+                    int new_index = min(bp2 + M7R * iy + dy, numPts2 - 1);
+                    if (score[dy][i] > max_score[i] || (score[dy][i] == max_score[i] && new_index < index[i]))
                     {
                         sec_score[i] = max_score[i];
                         max_score[i] = score[dy][i];
-                        index[i] = min(bp2 + M7R * iy + dy, numPts2 - 1);
+                        index[i] = new_index;
                     }
                     else if (score[dy][i] > sec_score[i])
                         sec_score[i] = score[dy][i];
@@ -467,6 +473,9 @@ double FindHomography(SiftData &data, float *homography, int *numMatches, int nu
                 p3 = dist(rng);
             while (p4 == p1 || p4 == p2 || p4 == p3)
                 p4 = dist(rng);
+
+            if (i < 5)
+                spdlog::debug("{:5}: {:5} {:5} {:5} {:5}", i, p1, p2, p3, p4);
 
             h_randPts[i + 0 * numLoops] = validPts[p1];
             h_randPts[i + 1 * numLoops] = validPts[p2];

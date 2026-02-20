@@ -8,10 +8,15 @@
 #include <iostream>
 #include <algorithm>
 #include <spdlog/spdlog.h>
-#include "cudautils.h"
 
+#include "cudautils.h"
 #include "cudaImage.h"
 #include "cudaSift.h"
+
+// ADDED FOR DETERMINISM: Include Thrust headers for sorting
+#include <thrust/sort.h>
+#include <thrust/device_ptr.h>
+#include <thrust/execution_policy.h>
 
 static float oldVariance = -1.0f;
 static float oldScale = -1.0f;
@@ -33,6 +38,24 @@ __device__ unsigned int d_PointCounter[8 * 2 + 1];
 __constant__ float d_ScaleDownKernel[5];
 __constant__ float d_LowPassKernel[2 * LOWPASS_R + 1];
 __constant__ float d_LaplaceKernel[8 * 12 * 16];
+
+// ADDED FOR DETERMINISM: Comparator for SiftPoint
+// This struct defines a "less than" comparison to give SiftPoints a stable order.
+struct SiftPointComparator
+{
+    __host__ __device__ bool operator()(const SiftPoint &a, const SiftPoint &b) const
+    {
+        if (a.subsampling != b.subsampling)
+        {
+            return a.subsampling < b.subsampling;
+        }
+        if (a.ypos != b.ypos)
+        {
+            return a.ypos < b.ypos;
+        }
+        return a.xpos < b.xpos;
+    }
+};
 
 void InitCuda(int devNum)
 {
@@ -82,7 +105,6 @@ SiftTempMem::SiftTempMem(int width, int height, int numOctaves)
     size_t pitch;
     size += sizeTmp;
     safeCall(cudaMallocPitch((void **)&memoryTmp, &pitch, (size_t)4096, (size + 4095) / 4096 * sizeof(float)));
-
     m_temp_device_ptr = memoryTmp;
 }
 
@@ -127,7 +149,6 @@ void SiftTempMem::clear()
 {
     if (m_temp_device_ptr)
         safeCall(cudaFree((void *)m_temp_device_ptr));
-
     m_temp_device_ptr = nullptr;
 }
 
@@ -144,26 +165,19 @@ void saveSiftData(const SiftData &siftData1, const SiftData &siftData2, const ch
         std::string SiftData1, SiftData2;
         std::string xpos1 = "", ypos1 = "", score1 = "", match_xpos1 = "", match_ypos1 = "";
         std::string xpos2 = "", ypos2 = "", score2 = "", match_xpos2 = "", match_ypos2 = "";
-
         char buff[32] = {0};
-
         for (int i = 0; i < siftData1.numPts; i++)
         {
             snprintf(buff, 32, "%.16e", siftData1.h_data[i].xpos);
             xpos1 += "\t\t\t" + std::string(buff);
-
             snprintf(buff, 32, "%.16e", siftData1.h_data[i].ypos);
             ypos1 += "\t\t\t" + std::string(buff);
-
             snprintf(buff, 32, "%.16e", siftData1.h_data[i].score);
             score1 += "\t\t\t" + std::string(buff);
-
             snprintf(buff, 32, "%.16e", siftData1.h_data[i].match_xpos);
             match_xpos1 += "\t\t\t" + std::string(buff);
-
             snprintf(buff, 32, "%.16e", siftData1.h_data[i].match_ypos);
             match_ypos1 += "\t\t\t" + std::string(buff);
-
             if (i < siftData1.numPts - 1)
             {
                 xpos1 += ",";
@@ -172,14 +186,12 @@ void saveSiftData(const SiftData &siftData1, const SiftData &siftData2, const ch
                 match_xpos1 += ",";
                 match_ypos1 += ",";
             }
-
             xpos1 += "\n";
             ypos1 += "\n";
             score1 += "\n";
             match_xpos1 += "\n";
             match_ypos1 += "\n";
         }
-
         SiftData1 = std::string("\t") + "\"SiftData1\": {\n" +
                     "\t\t\"xpos\": [\n" +
                     xpos1 +
@@ -197,27 +209,20 @@ void saveSiftData(const SiftData &siftData1, const SiftData &siftData2, const ch
                     match_ypos1 +
                     "\t\t]\n" +
                     "\t},\n";
-
         xpos1 = "", ypos1 = "", score1 = "", match_xpos1 = "", match_ypos1 = "";
         xpos2 = "", ypos2 = "", score2 = "", match_xpos2 = "", match_ypos2 = "";
-
         for (int i = 0; i < siftData2.numPts; i++)
         {
             snprintf(buff, 32, "%.16e", siftData2.h_data[i].xpos);
             xpos1 += "\t\t\t" + std::string(buff);
-
             snprintf(buff, 32, "%.16e", siftData2.h_data[i].ypos);
             ypos1 += "\t\t\t" + std::string(buff);
-
             snprintf(buff, 32, "%.16e", siftData2.h_data[i].score);
             score1 += "\t\t\t" + std::string(buff);
-
             snprintf(buff, 32, "%.16e", siftData2.h_data[i].match_xpos);
             match_xpos1 += "\t\t\t" + std::string(buff);
-
             snprintf(buff, 32, "%.16e", siftData2.h_data[i].match_ypos);
             match_ypos1 += "\t\t\t" + std::string(buff);
-
             if (i < siftData2.numPts - 1)
             {
                 xpos1 += ",";
@@ -226,14 +231,12 @@ void saveSiftData(const SiftData &siftData1, const SiftData &siftData2, const ch
                 match_xpos1 += ",";
                 match_ypos1 += ",";
             }
-
             xpos1 += "\n";
             ypos1 += "\n";
             score1 += "\n";
             match_xpos1 += "\n";
             match_ypos1 += "\n";
         }
-
         SiftData2 = std::string("\t") + "\"SiftData2\": {\n" +
                     "\t\t\"xpos\": [\n" +
                     xpos1 +
@@ -251,7 +254,6 @@ void saveSiftData(const SiftData &siftData1, const SiftData &siftData2, const ch
                     match_ypos1 +
                     "\t\t]\n" +
                     "\t}\n";
-
         fprintf(fp, "{\n%s%s}\n", SiftData1.c_str(), SiftData2.c_str());
         fclose(fp);
     }
@@ -274,7 +276,6 @@ void SiftData::Allocate(int num, bool host, bool dev)
     numPts = 0;
     maxPts = num;
     int sz = sizeof(SiftPoint) * num;
-
     h_data = NULL;
     if (host)
         h_data = new SiftPoint[num];
@@ -318,14 +319,29 @@ double ExtractSift(SiftData &siftData, CudaImage &img, int numOctaves, double in
 
     CudaImage lowImg;
     lowImg.Allocate(width, height, iAlignUp(width, 128), false, memorySub);
+
     float kernel[8 * 12 * 16];
     PrepareLaplaceKernels(numOctaves, 0.0f, kernel);
     safeCall(cudaMemcpyToSymbolAsync(d_LaplaceKernel, kernel, 8 * 12 * 16 * sizeof(float)));
+
     LowPass(lowImg, img, max(initBlur, 0.001f));
     TimerGPU timer1(0);
+
     ExtractSiftLoop(siftData, lowImg, numOctaves, 0.0f, thresh, lowestScale, 1.0f, memoryTmp, memorySub + height * iAlignUp(width, 128));
+
     safeCall(cudaMemcpy(&siftData.numPts, &d_PointCounterAddr[2 * numOctaves], sizeof(int), cudaMemcpyDeviceToHost));
     siftData.numPts = (siftData.numPts < siftData.maxPts ? siftData.numPts : siftData.maxPts);
+
+    // ADDED FOR DETERMINISM: Sort the points to ensure a consistent output order
+    if (siftData.numPts > 0)
+    {
+        // Create Thrust device pointers from the raw CUDA pointers
+        thrust::device_ptr<SiftPoint> d_sift_ptr = thrust::device_pointer_cast(siftData.d_data);
+
+        // Sort the SiftPoint array on the device
+        thrust::sort(thrust::device, d_sift_ptr, d_sift_ptr + siftData.numPts, SiftPointComparator());
+    }
+    // END ADDED FOR DETERMINISM
 
     if (!tempMemory)
         safeCall(cudaFree(memoryTmp));
@@ -339,7 +355,6 @@ double ExtractSift(SiftData &siftData, CudaImage &img, int numOctaves, double in
 // Keep
 int ExtractSiftLoop(SiftData &siftData, CudaImage &img, int numOctaves, double initBlur, float thresh, float lowestScale, float subsampling, float *memoryTmp, float *memorySub)
 {
-
     int w = img.width;
     int h = img.height;
     if (numOctaves > 1)
@@ -352,7 +367,6 @@ int ExtractSiftLoop(SiftData &siftData, CudaImage &img, int numOctaves, double i
         ExtractSiftLoop(siftData, subImg, numOctaves - 1, totInitBlur, thresh, lowestScale, subsampling * 2.0f, memoryTmp, memorySub + (h / 2) * p);
     }
     ExtractSiftOctave(siftData, img, numOctaves, thresh, lowestScale, subsampling, memoryTmp);
-
     return 0;
 }
 
@@ -376,6 +390,7 @@ void ExtractSiftOctave(SiftData &siftData, CudaImage &img, int octave, float thr
     resDesc.res.pitch2D.height = img.height;
     resDesc.res.pitch2D.pitchInBytes = img.pitch * sizeof(float);
     resDesc.res.pitch2D.desc = cudaCreateChannelDesc<float>();
+
     // Specify texture object parameters
     struct cudaTextureDesc texDesc;
     memset(&texDesc, 0, sizeof(texDesc));
@@ -384,12 +399,14 @@ void ExtractSiftOctave(SiftData &siftData, CudaImage &img, int octave, float thr
     texDesc.filterMode = cudaFilterModeLinear;
     texDesc.readMode = cudaReadModeElementType;
     texDesc.normalizedCoords = 0;
+
     // Create texture object
     cudaTextureObject_t texObj = 0;
     cudaCreateTextureObject(&texObj, &resDesc, &texDesc, NULL);
 
     float baseBlur = pow(2.0f, -1.0f / NUM_SCALES);
     float diffScale = pow(2.0f, 1.0f / NUM_SCALES);
+
     LaplaceMulti(texObj, img, diffImg, octave);
     FindPointsMulti(diffImg, siftData, thresh, 10.0f, 1.0f / NUM_SCALES, lowestScale / subsampling, subsampling, octave);
     ComputeOrientations(texObj, img, siftData, octave);
@@ -480,7 +497,6 @@ double ScaleDown(CudaImage &res, CudaImage &src, float variance)
     dim3 blocks(iDivUp(src.width, SCALEDOWN_W), iDivUp(src.height, SCALEDOWN_H));
     dim3 threads(SCALEDOWN_W + 4);
     ScaleDown_kernel<<<blocks, threads>>>(res.d_data, src.d_data, src.width, src.pitch, src.height, res.pitch);
-
     checkMsg("ScaleDown() execution failed\n");
     return 0.0;
 }
@@ -598,7 +614,6 @@ double LaplaceMulti(cudaTextureObject_t texObj, CudaImage &baseImage, CudaImage 
     int width = results[0].width;
     int pitch = results[0].pitch;
     int height = results[0].height;
-
     dim3 threads(LAPLACE_W + 2 * LAPLACE_R);
     dim3 blocks(iDivUp(width, LAPLACE_W), height);
     LaplaceMultiMem_kernel<<<blocks, threads>>>(baseImage.d_data, results[0].d_data, width, pitch, height, octave);
@@ -617,18 +632,15 @@ double FindPointsMulti(CudaImage *sources, SiftData &siftData, float thresh, flo
     int w = sources->width;
     int p = sources->pitch;
     int h = sources->height;
-
     dim3 blocks(iDivUp(w, MINMAX_W) * NUM_SCALES, iDivUp(h, MINMAX_H));
     dim3 threads(MINMAX_W + 2);
     FindPointsMultiNew_kernel<<<blocks, threads>>>(sources->d_data, siftData.d_data, w, p, h, subsampling, lowestScale, thresh, factor, edgeLimit, octave);
-
     checkMsg("FindPointsMulti() execution failed\n");
     return 0.0;
 }
 
 /////////////////////////////////////////////////////////
 //// Kernels
-
 ///////////////////////////////////////////////////////////////////////////////
 // Lowpass filter and subsample image
 ///////////////////////////////////////////////////////////////////////////////
@@ -640,6 +652,7 @@ static __global__ void ScaleDown_kernel(float *d_Result, float *d_Data, int widt
     __shared__ float brow[5 * (SCALEDOWN_W / 2)];
     __shared__ int yRead[SCALEDOWN_H + 4];
     __shared__ int yWrite[SCALEDOWN_H + 4];
+
 #define dx2 (SCALEDOWN_W / 2)
     const int tx = threadIdx.x;
     const int tx0 = tx + 0 * dx2;
@@ -665,7 +678,6 @@ static __global__ void ScaleDown_kernel(float *d_Result, float *d_Data, int widt
     int xRead = xStart + tx - 2;
     xRead = (xRead < 0 ? 0 : xRead);
     xRead = (xRead >= width ? width - 1 : xRead);
-
     int maxtx = min(dx2, width / 2 - xStart / 2);
     for (int dy = 0; dy < SCALEDOWN_H + 4; dy += 5)
     {
@@ -775,23 +787,19 @@ static __global__ void ExtractSiftDescriptorsCONSTNew_kernel(cudaTextureObject_t
     __shared__ float gauss[16];
     __shared__ float buffer[128];
     __shared__ float sums[4];
-
     const int tx = threadIdx.x; // 0 -> 16
     const int ty = threadIdx.y; // 0 -> 8
     const int idx = ty * 16 + tx;
     if (ty == 0)
         gauss[tx] = __expf(-(tx - 7.5f) * (tx - 7.5f) / 128.0f);
-
     int fstPts = min(d_PointCounter[2 * octave - 1], d_MaxNumPoints);
     int totPts = min(d_PointCounter[2 * octave + 1], d_MaxNumPoints);
     // if (tx==0 && ty==0)
     //   printf("%d %d %d %d\n", octave, fstPts, min(d_PointCounter[2*octave], d_MaxNumPoints), totPts);
     for (int bx = blockIdx.x + fstPts; bx < totPts; bx += gridDim.x)
     {
-
         buffer[idx] = 0.0f;
         __syncthreads();
-
         // Compute angles and gradients
         float theta = 2.0f * 3.1415f / 360.0f * d_sift[bx].orientation;
         float sina = __sinf(theta); // cosa -sina
@@ -799,7 +807,6 @@ static __global__ void ExtractSiftDescriptorsCONSTNew_kernel(cudaTextureObject_t
         float scale = 12.0f / 16.0f * d_sift[bx].scale;
         float ssina = scale * sina;
         float scosa = scale * cosa;
-
         for (int y = ty; y < 16; y += 8)
         {
             float xpos = d_sift[bx].xpos + (tx - 7.5f) * scosa - (y - 7.5f) * ssina + 0.5f;
@@ -810,7 +817,6 @@ static __global__ void ExtractSiftDescriptorsCONSTNew_kernel(cudaTextureObject_t
                        tex2D<float>(texObj, xpos + sina, ypos - cosa);
             float grad = gauss[y] * gauss[tx] * __fsqrt_rn(dx * dx + dy * dy);
             float angf = 4.0f / 3.1415f * FastAtan2_device(dy, dx) + 4.0f;
-
             int hori = (tx + 2) / 4 - 1; // Convert from (tx,y,angle) to bins
             float horf = (tx - 1.5f) / 4.0f - hori;
             float ihorf = 1.0f - horf;
@@ -821,7 +827,6 @@ static __global__ void ExtractSiftDescriptorsCONSTNew_kernel(cudaTextureObject_t
             int angp = (angi < 7 ? angi + 1 : 0);
             angf -= angi;
             float iangf = 1.0f - angf;
-
             int hist = 8 * (4 * veri + hori); // Each gradient measure is interpolated
             int p1 = angi + hist;             // in angles, xpos and ypos -> 8 stores
             int p2 = angp + hist;
@@ -859,7 +864,6 @@ static __global__ void ExtractSiftDescriptorsCONSTNew_kernel(cudaTextureObject_t
             }
         }
         __syncthreads();
-
         // Normalize twice and suppress peaks first time
         float sum = buffer[idx] * buffer[idx];
         for (int i = 16; i > 0; i /= 2)
@@ -869,14 +873,12 @@ static __global__ void ExtractSiftDescriptorsCONSTNew_kernel(cudaTextureObject_t
         __syncthreads();
         float tsum1 = sums[0] + sums[1] + sums[2] + sums[3];
         tsum1 = min(buffer[idx] * rsqrtf(tsum1), 0.2f);
-
         sum = tsum1 * tsum1;
         for (int i = 16; i > 0; i /= 2)
             sum += ShiftDown(sum, i);
         if ((idx & 31) == 0)
             sums[idx / 32] = sum;
         __syncthreads();
-
         float tsum2 = sums[0] + sums[1] + sums[2] + sums[3];
         float *desc = d_sift[bx].data;
         desc[idx] = tsum1 * rsqrtf(tsum2);
@@ -896,7 +898,6 @@ static __device__ void ExtractSiftDescriptor_device(cudaTextureObject_t texObj, 
     __shared__ float gauss[16];
     __shared__ float buffer[128];
     __shared__ float sums[4];
-
     const int idx = threadIdx.x;
     const int tx = idx & 15; // 0 -> 16
     const int ty = idx / 16; // 0 -> 8
@@ -904,7 +905,6 @@ static __device__ void ExtractSiftDescriptor_device(cudaTextureObject_t texObj, 
         gauss[tx] = exp(-(tx - 7.5f) * (tx - 7.5f) / 128.0f);
     buffer[idx] = 0.0f;
     __syncthreads();
-
     // Compute angles and gradients
     float theta = 2.0f * 3.1415f / 360.0f * d_sift[bx].orientation;
     float sina = sinf(theta); // cosa -sina
@@ -912,7 +912,6 @@ static __device__ void ExtractSiftDescriptor_device(cudaTextureObject_t texObj, 
     float scale = 12.0f / 16.0f * d_sift[bx].scale;
     float ssina = scale * sina;
     float scosa = scale * cosa;
-
     for (int y = ty; y < 16; y += 8)
     {
         float xpos = d_sift[bx].xpos + (tx - 7.5f) * scosa - (y - 7.5f) * ssina + 0.5f;
@@ -923,7 +922,6 @@ static __device__ void ExtractSiftDescriptor_device(cudaTextureObject_t texObj, 
                    tex2D<float>(texObj, xpos + sina, ypos - cosa);
         float grad = gauss[y] * gauss[tx] * sqrtf(dx * dx + dy * dy);
         float angf = 4.0f / 3.1415f * atan2f(dy, dx) + 4.0f;
-
         int hori = (tx + 2) / 4 - 1; // Convert from (tx,y,angle) to bins
         float horf = (tx - 1.5f) / 4.0f - hori;
         float ihorf = 1.0f - horf;
@@ -934,7 +932,6 @@ static __device__ void ExtractSiftDescriptor_device(cudaTextureObject_t texObj, 
         int angp = (angi < 7 ? angi + 1 : 0);
         angf -= angi;
         float iangf = 1.0f - angf;
-
         int hist = 8 * (4 * veri + hori); // Each gradient measure is interpolated
         int p1 = angi + hist;             // in angles, xpos and ypos -> 8 stores
         int p2 = angp + hist;
@@ -972,7 +969,6 @@ static __device__ void ExtractSiftDescriptor_device(cudaTextureObject_t texObj, 
         }
     }
     __syncthreads();
-
     // Normalize twice and suppress peaks first time
     float sum = buffer[idx] * buffer[idx];
     for (int i = 16; i > 0; i /= 2)
@@ -982,14 +978,12 @@ static __device__ void ExtractSiftDescriptor_device(cudaTextureObject_t texObj, 
     __syncthreads();
     float tsum1 = sums[0] + sums[1] + sums[2] + sums[3];
     tsum1 = min(buffer[idx] * rsqrtf(tsum1), 0.2f);
-
     sum = tsum1 * tsum1;
     for (int i = 16; i > 0; i /= 2)
         sum += ShiftDown(sum, i);
     if ((idx & 31) == 0)
         sums[idx / 32] = sum;
     __syncthreads();
-
     float tsum2 = sums[0] + sums[1] + sums[2] + sums[3];
     float *desc = d_sift[bx].data;
     desc[idx] = tsum1 * rsqrtf(tsum2);
@@ -1021,12 +1015,10 @@ static __global__ void ComputeOrientationsCONST_kernel(cudaTextureObject_t texOb
     __shared__ float hist[64];
     __shared__ float gauss[11];
     const int tx = threadIdx.x;
-
     int fstPts = min(d_PointCounter[2 * octave - 1], d_MaxNumPoints);
     int totPts = min(d_PointCounter[2 * octave + 0], d_MaxNumPoints);
     for (int bx = blockIdx.x + fstPts; bx < totPts; bx += gridDim.x)
     {
-
         float i2sigma2 = -1.0f / (2.0f * 1.5f * 1.5f * d_Sift[bx].scale * d_Sift[bx].scale);
         if (tx < 11)
             gauss[tx] = exp(i2sigma2 * (tx - 5) * (tx - 5));
@@ -1123,12 +1115,10 @@ static __global__ void OrientAndExtractCONST_kernel(cudaTextureObject_t texObj, 
     __shared__ float gauss[11];
     __shared__ unsigned int idx; //%%%%
     const int tx = threadIdx.x;
-
     int fstPts = min(d_PointCounter[2 * octave - 1], d_MaxNumPoints);
     int totPts = min(d_PointCounter[2 * octave + 0], d_MaxNumPoints);
     for (int bx = blockIdx.x + fstPts; bx < totPts; bx += gridDim.x)
     {
-
         float i2sigma2 = -1.0f / (4.5f * d_Sift[bx].scale * d_Sift[bx].scale);
         if (tx < 11)
             gauss[tx] = exp(i2sigma2 * (tx - 5) * (tx - 5));
@@ -1228,9 +1218,9 @@ static __global__ void OrientAndExtractCONST_kernel(cudaTextureObject_t texObj, 
 // Keep
 static __global__ void FindPointsMultiNew_kernel(float *d_Data0, SiftPoint *d_Sift, int width, int pitch, int height, float subsampling, float lowestScale, float thresh, float factor, float edgeLimit, int octave)
 {
+
 #define MEMWID (MINMAX_W + 2)
     __shared__ unsigned short points[2 * MEMWID];
-
     if (blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 0)
     {
         atomicMax(&d_PointCounter[2 * octave + 0], d_PointCounter[2 * octave - 1]);
@@ -1244,7 +1234,6 @@ static __global__ void FindPointsMultiNew_kernel(float *d_Data0, SiftPoint *d_Si
     int xpos = minx + tx;
     int size = pitch * height;
     int ptr = size * scale + max(min(xpos - 1, width - 1), 0);
-
     int yloops = min(height - MINMAX_H * blockIdx.y, MINMAX_H);
     float maxv = 0.0f;
     for (int y = 0; y < yloops; y++)
@@ -1258,24 +1247,20 @@ static __global__ void FindPointsMultiNew_kernel(float *d_Data0, SiftPoint *d_Si
     if (!__any_sync(0xffffffff, maxv > thresh))
         return;
     // if (tx==0) printf("XXX2\n");
-
     int ptbits = 0;
     for (int y = 0; y < yloops; y++)
     {
-
         int ypos = MINMAX_H * blockIdx.y + y;
         int yptr1 = ptr + ypos * pitch;
         float d11 = d_Data0[yptr1 + 1 * size];
         if (__any_sync(0xffffffff, fabs(d11) > thresh))
         {
-
             int yptr0 = ptr + max(0, ypos - 1) * pitch;
             int yptr2 = ptr + min(height - 1, ypos + 1) * pitch;
             float d01 = d_Data0[yptr1];
             float d10 = d_Data0[yptr0 + 1 * size];
             float d12 = d_Data0[yptr2 + 1 * size];
             float d21 = d_Data0[yptr1 + 2 * size];
-
             float d00 = d_Data0[yptr0];
             float d02 = d_Data0[yptr2];
             float ymin1 = fminf(fminf(d00, d01), d02);
@@ -1286,19 +1271,16 @@ static __global__ void FindPointsMultiNew_kernel(float *d_Data0, SiftPoint *d_Si
             float ymax3 = fmaxf(fmaxf(d20, d21), d22);
             float ymin2 = fminf(fminf(ymin1, fminf(fminf(d10, d12), d11)), ymin3);
             float ymax2 = fmaxf(fmaxf(ymax1, fmaxf(fmaxf(d10, d12), d11)), ymax3);
-
             float nmin2 = fminf(ShiftUp(ymin2, 1), ShiftDown(ymin2, 1));
             float nmax2 = fmaxf(ShiftUp(ymax2, 1), ShiftDown(ymax2, 1));
             float minv = fminf(fminf(nmin2, ymin1), ymin3);
             minv = fminf(fminf(minv, d10), d12);
             float maxv = fmaxf(fmaxf(nmax2, ymax1), ymax3);
             maxv = fmaxf(fmaxf(maxv, d10), d12);
-
             if (tx > 0 && tx < MINMAX_W + 1 && xpos <= maxx)
                 ptbits |= ((d11 < fminf(-thresh, minv)) | (d11 > fmaxf(thresh, maxv))) << y;
         }
     }
-
     unsigned int totbits = __popc(ptbits);
     unsigned int numbits = totbits;
     for (int d = 1; d < 32; d <<= 1)
@@ -1318,7 +1300,6 @@ static __global__ void FindPointsMultiNew_kernel(float *d_Data0, SiftPoint *d_Si
             pos++;
         }
     }
-
     totbits = Shuffle(totbits, 31);
     if (tx < totbits)
     {
@@ -1366,13 +1347,15 @@ static __global__ void FindPointsMultiNew_kernel(float *d_Data0, SiftPoint *d_Si
             {
                 atomicMax(&d_PointCounter[2 * octave + 0], d_PointCounter[2 * octave - 1]);
                 unsigned int idx = atomicInc(&d_PointCounter[2 * octave + 0], 0x7fffffff);
-                idx = (idx >= maxPts ? maxPts - 1 : idx);
-                d_Sift[idx].xpos = xpos + pdx;
-                d_Sift[idx].ypos = ypos + pdy;
-                d_Sift[idx].scale = sc;
-                d_Sift[idx].sharpness = val + dval;
-                d_Sift[idx].edgeness = edge;
-                d_Sift[idx].subsampling = subsampling;
+                if (idx < maxPts)
+                {
+                    d_Sift[idx].xpos = xpos + pdx;
+                    d_Sift[idx].ypos = ypos + pdy;
+                    d_Sift[idx].scale = sc;
+                    d_Sift[idx].sharpness = val + dval;
+                    d_Sift[idx].edgeness = edge;
+                    d_Sift[idx].subsampling = subsampling;
+                }
             }
         }
     }
