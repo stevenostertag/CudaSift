@@ -443,7 +443,7 @@ double FindHomography(SiftData &data, float *homography, int *numMatches, int nu
 #ifdef DETERMINISTIC_TESTING
         // For testing, use a fixed seed for reproducible results.
         rng.seed(12345);
-        spdlog::info("Using deterministic seed for RNG.");
+        spdlog::debug("Using deterministic seed for RNG.");
 #else
         // For practical use, seed with a non-deterministic random number.
         std::random_device rd;
