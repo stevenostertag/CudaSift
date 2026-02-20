@@ -2,6 +2,7 @@
 #include "cudautils.h"
 
 #include <spdlog/spdlog.h>
+#include <random>
 
 // Private class, helpful for auto freeing when there is an error
 template <typename T>
@@ -436,18 +437,37 @@ double FindHomography(SiftData &data, float *homography, int *numMatches, int nu
     delete[] h_ambiguities;
     if (numValid >= 8)
     {
+        // 1. Create a random number engine.
+        std::mt19937 rng;
+
+#ifdef DETERMINISTIC_TESTING
+        // For testing, use a fixed seed for reproducible results.
+        rng.seed(12345);
+        spdlog::info("Using deterministic seed for RNG.");
+#else
+        // For practical use, seed with a non-deterministic random number.
+        std::random_device rd;
+        rng.seed(rd());
+#endif
+
+        // 2. Create a distribution that will generate integers in the range [0, numValid - 1].
+        std::uniform_int_distribution<int> dist(0, numValid - 1);
+
         for (int i = 0; i < numLoops; i++)
         {
-            int p1 = rand() % numValid;
-            int p2 = rand() % numValid;
-            int p3 = rand() % numValid;
-            int p4 = rand() % numValid;
+            // 3. Use the distribution and engine to generate numbers.
+            int p1 = dist(rng);
+            int p2 = dist(rng);
+            int p3 = dist(rng);
+            int p4 = dist(rng);
+
             while (p2 == p1)
-                p2 = rand() % numValid;
+                p2 = dist(rng);
             while (p3 == p1 || p3 == p2)
-                p3 = rand() % numValid;
+                p3 = dist(rng);
             while (p4 == p1 || p4 == p2 || p4 == p3)
-                p4 = rand() % numValid;
+                p4 = dist(rng);
+
             h_randPts[i + 0 * numLoops] = validPts[p1];
             h_randPts[i + 1 * numLoops] = validPts[p2];
             h_randPts[i + 2 * numLoops] = validPts[p3];
