@@ -26,7 +26,6 @@ extern "C"
     struct cudasift_settings
     {
         // Default
-        int max_num_features;                   // 1,000
         float initial_gauss_blur;               // 1.0
         float extract_sift_thresh;              // 2.0f
         float lowest_scale;                     // 0.0f

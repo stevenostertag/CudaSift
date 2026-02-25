@@ -24,7 +24,6 @@ int main(int argc, char **argv)
     struct cudasift_settings settings;
     int res = 0;
 
-    settings.max_num_features = 20000;
     settings.initial_gauss_blur = 1.0;
     settings.extract_sift_thresh = 2.0f;
     settings.lowest_scale = 0.0f;
