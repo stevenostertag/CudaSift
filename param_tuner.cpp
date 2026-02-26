@@ -324,10 +324,10 @@ void analyze_results(const std::string &csv_path)
         bool passed = (fields[2] == "true");
         float inlier_ratio = std::stof(fields[3]);
         ParamKey key;
-        key.initial_gauss_blur = std::stod(fields[10]);
-        key.extract_sift_thresh = std::stof(fields[11]);
-        key.num_octaves = std::stoi(fields[12]);
-        key.find_homography_thresh = std::stof(fields[13]);
+        key.initial_gauss_blur = std::stod(fields[9]);
+        key.extract_sift_thresh = std::stof(fields[10]);
+        key.num_octaves = std::stoi(fields[11]);
+        key.find_homography_thresh = std::stof(fields[12]);
         analysis_map[key].total_runs++;
         if (passed)
         {
