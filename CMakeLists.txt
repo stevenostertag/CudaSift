@@ -229,8 +229,7 @@ else()
       EXPORT "visual_debuggerExports"
       RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
   endif()
-  install(FILES cuSIFT.h EXPORT "${PROJECT_NAME}Exports"
-          DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
+  install(FILES cuSIFT.h DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
 endif()
 
 # --- Add this block to create the parameter tuner executable ---
