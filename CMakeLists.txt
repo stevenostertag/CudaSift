@@ -99,14 +99,14 @@ target_link_libraries(cudasift PRIVATE spdlog)
 
 # Link libraries, only cuda
 if(WIN32)
-  target_link_libraries(cudasift PUBLIC CUDA::cublas CUDA::cudart_static)
+  target_link_libraries(cudasift PUBLIC CUDA::cublas_static CUDA::cudart_static)
   if(OpenMP_C_FOUND)
     target_link_libraries(cudasift PUBLIC OpenMP::OpenMP_C)
   elseif(OpenMP_CXX_FOUND)
     target_link_libraries(cudasift PUBLIC OpenMP::OpenMP_CXX)
   endif()
 else()
-  target_link_libraries(cudasift PUBLIC CUDA::cublas CUDA::cudart_static)
+  target_link_libraries(cudasift PUBLIC CUDA::cublas_static CUDA::cudart_static)
   if(OpenMP_C_FOUND)
     target_link_libraries(cudasift PUBLIC OpenMP::OpenMP_C)
   elseif(OpenMP_CXX_FOUND)
@@ -120,7 +120,8 @@ endif()
 if(WIN32)
   add_executable(test_cuda_sift cudasift_test.cu cuSIFT.cu geomFuncs_blas.cu
                                 matching.cu cudaImage.cu cudaSift.cu)
-  target_link_libraries(test_cuda_sift PUBLIC CUDA::cublas CUDA::cudart_static)
+  target_link_libraries(test_cuda_sift PUBLIC CUDA::cublas_static
+                                              CUDA::cudart_static)
   if(OpenMP_C_FOUND)
     target_link_libraries(test_cuda_sift PUBLIC OpenMP::OpenMP_C)
   elseif(OpenMP_CXX_FOUND)
@@ -144,7 +145,8 @@ if(CUDASIFT_VISUAL_DEBUGGER)
       visual_debugger visual_debugger.cpp cuSIFT.cu geomFuncs_blas.cu
                       matching.cu cudaImage.cu cudaSift.cu)
     target_link_libraries(
-      visual_debugger PUBLIC CUDA::cublas CUDA::cudart_static ${OpenCV_LIBS})
+      visual_debugger PUBLIC CUDA::cublas_static CUDA::cudart_static
+                             ${OpenCV_LIBS})
     if(OpenMP_C_FOUND)
       target_link_libraries(visual_debugger PUBLIC OpenMP::OpenMP_C)
     elseif(OpenMP_CXX_FOUND)
